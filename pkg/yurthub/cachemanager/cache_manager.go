@@ -64,6 +64,12 @@ type CacheManager interface {
 	QueryCache(req *http.Request) (runtime.Object, error)
 	CanCacheFor(req *http.Request) bool
 	DeleteKindFor(gvr schema.GroupVersionResource) error
+	QueryCacheResult() CacheResult
+}
+
+type CacheResult struct {
+	Length int
+	Msg    string
 }
 
 type cacheManager struct {
@@ -92,8 +98,15 @@ func NewCacheManager(
 		listSelectorCollector: make(map[storage.Key]string),
 		inMemoryCache:         make(map[string]runtime.Object),
 	}
-
 	return cm
+}
+
+func (cm *cacheManager) QueryCacheResult() CacheResult {
+	length, msg := cm.storage.GetCacheResult()
+	return CacheResult{
+		Length: length,
+		Msg:    msg,
+	}
 }
 
 // CacheResponse cache response of request into backend storage
@@ -190,7 +203,7 @@ func (cm *cacheManager) queryListObject(req *http.Request) (runtime.Object, erro
 	} else if len(objs) == 0 {
 		if isKubeletPodRequest(req) {
 			// because at least there will be yurt-hub pod on the node.
-			// if no pods in cache, maybe all of pods have been deleted by accident,
+			// if no pods in cache, maybe all pods have been deleted by accident,
 			// if empty object is returned, pods on node will be deleted by kubelet.
 			// in order to prevent the influence to business, return error here so pods
 			// will be kept on node.
@@ -229,7 +242,7 @@ func (cm *cacheManager) queryOneObject(req *http.Request) (runtime.Object, error
 	comp, _ := util.ClientComponentFrom(ctx)
 	// query in-memory cache first
 	var isInMemoryCacheMiss bool
-	if obj, err := cm.queryInMemeryCache(ctx, info); err != nil {
+	if obj, err := cm.queryInMemoryCache(ctx, info); err != nil {
 		if err == ErrInMemoryCacheMiss {
 			isInMemoryCacheMiss = true
 			klog.V(4).Infof("in-memory cache miss when handling request %s, fall back to storage query", util.ReqString(req))
@@ -266,7 +279,7 @@ func (cm *cacheManager) queryOneObject(req *http.Request) (runtime.Object, error
 	// we need to rebuild the in-memory cache with backend consistent storage.
 	// Note:
 	// When cloud-edge network is healthy, the inMemoryCache can be updated with response from cloud side.
-	// While cloud-edge network is broken, the inMemoryCache can only be full filled with data from edge cache,
+	// While cloud-edge network is broken, the inMemoryCache can only be fulfilled with data from edge cache,
 	// such as local disk and yurt-coordinator.
 	if isInMemoryCacheMiss {
 		return obj, cm.updateInMemoryCache(ctx, info, obj)
@@ -373,7 +386,6 @@ func (cm *cacheManager) saveWatchObject(ctx context.Context, info *apirequest.Re
 				klog.Errorf("could not get namespace of watch object, %v", err)
 				continue
 			}
-
 			key, err := cm.storage.KeyFunc(storage.KeyBuildInfo{
 				Component: comp,
 				Namespace: ns,
@@ -405,7 +417,7 @@ func (cm *cacheManager) saveWatchObject(ctx context.Context, info *apirequest.Re
 				// for now, If it's a delete request, no need to modify the inmemory cache,
 				// because currently, there shouldn't be any delete requests for nodes or leases.
 			default:
-				// impossible go to here
+				// impossible go here
 			}
 
 			if info.Resource == "pods" {
@@ -494,7 +506,6 @@ func (cm *cacheManager) saveListObject(ctx context.Context, info *apirequest.Req
 			if ns == "" {
 				ns = info.Namespace
 			}
-
 			key, _ := cm.storage.KeyFunc(storage.KeyBuildInfo{
 				Component: comp,
 				Namespace: ns,
@@ -573,7 +584,6 @@ func (cm *cacheManager) saveOneObject(ctx context.Context, info *apirequest.Requ
 		klog.Errorf("could not store object %s, %v", key.Key(), err)
 		return err
 	}
-
 	return cm.updateInMemoryCache(ctx, info, obj)
 }
 
@@ -611,19 +621,19 @@ func (cm *cacheManager) storeObjectWithKey(key storage.Key, obj runtime.Object) 
 	newRvUint, _ := strconv.ParseUint(newRv, 10, 64)
 	_, err = cm.storage.Update(key, obj, newRvUint)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return nil
-	case storage.ErrStorageNotFound:
+	case errors.Is(err, storage.ErrStorageNotFound):
 		klog.V(4).Infof("find no cached obj of key: %s, create it with the coming obj with rv: %s", key.Key(), newRv)
 		if err := cm.storage.Create(key, obj); err != nil {
-			if err == storage.ErrStorageAccessConflict {
+			if errors.Is(err, storage.ErrStorageAccessConflict) {
 				klog.V(2).Infof("skip to cache obj because key(%s) is under processing", key.Key())
 				return nil
 			}
 			return fmt.Errorf("could not create obj of key: %s, %v", key.Key(), err)
 		}
-	case storage.ErrStorageAccessConflict:
+	case errors.Is(err, storage.ErrStorageAccessConflict):
 		klog.V(2).Infof("skip to cache watch event because key(%s) is under processing", key.Key())
 		return nil
 	default:
@@ -775,7 +785,7 @@ func (cm *cacheManager) DeleteKindFor(gvr schema.GroupVersionResource) error {
 	return cm.restMapperManager.DeleteKindFor(gvr)
 }
 
-func (cm *cacheManager) queryInMemeryCache(ctx context.Context, reqInfo *apirequest.RequestInfo) (runtime.Object, error) {
+func (cm *cacheManager) queryInMemoryCache(ctx context.Context, reqInfo *apirequest.RequestInfo) (runtime.Object, error) {
 	if !isInMemoryCache(ctx) {
 		return nil, ErrNotNodeOrLease
 	}

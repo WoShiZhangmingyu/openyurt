@@ -58,7 +58,7 @@ func mockNode() *corev1.Node {
 	}
 }
 
-func TestEnqueueRequestFoServiceEvent(t *testing.T) {
+func TestEnqueueRequestForServiceEvent(t *testing.T) {
 	h := &EnqueueRequestForServiceEvent{}
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	svc := mockService()
@@ -116,4 +116,13 @@ func TestEnqueueRequestForNodeEvent(t *testing.T) {
 		t.Errorf("failed to create node, expected %d, but get %d", 1, queue.Len())
 	}
 	clearQueue(queue)
+}
+
+func TestInvalidTypeScene(t *testing.T) {
+	h := &EnqueueRequestForNodeEvent{}
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	h.Create(context.Background(), event.CreateEvent{}, queue)
+	h.Delete(context.Background(), event.DeleteEvent{}, queue)
+	h.Update(context.Background(), event.UpdateEvent{}, queue)
+	assert.Equal(t, 0, queue.Len(), "invalid type work queue should be 0")
 }
