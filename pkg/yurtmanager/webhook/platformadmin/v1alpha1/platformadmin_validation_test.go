@@ -77,7 +77,7 @@ func TestValidateCreate(t *testing.T) {
 			obj: &v1alpha1.PlatformAdmin{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "not-exit-poll",
+					NodePools: []string{"not-exit-poll"},
 				},
 			},
 			errCode: http.StatusUnprocessableEntity,
@@ -88,7 +88,7 @@ func TestValidateCreate(t *testing.T) {
 			obj: &v1alpha1.PlatformAdmin{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "beijing",
+					NodePools: []string{"beijing"},
 				},
 			},
 			errCode: http.StatusUnprocessableEntity,
@@ -101,7 +101,7 @@ func TestValidateCreate(t *testing.T) {
 					Name: "hangzhou-PlatformAdmin",
 				},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "beijing",
+					NodePools: []string{"beijing"},
 				},
 			},
 			errCode: http.StatusUnprocessableEntity,
@@ -114,7 +114,7 @@ func TestValidateCreate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "beijing",
+					NodePools: []string{"beijing"},
 				},
 			},
 			errCode: 0,
@@ -167,7 +167,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "beijing",
+					NodePools: []string{"beijing"},
 				},
 			},
 			newObj:  &v1alpha1.PlatformAdmin{},
@@ -182,7 +182,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "beijing",
+					NodePools: []string{"beijing"},
 				},
 			},
 			errCode: http.StatusUnprocessableEntity,
@@ -195,7 +195,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "beijing",
+					NodePools: []string{"beijing"},
 				},
 			},
 			newObj: &v1alpha1.PlatformAdmin{
@@ -203,7 +203,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha1.PlatformAdminSpec{
-					PoolName: "beijing",
+					NodePools: []string{"beijing"},
 				},
 			},
 			errCode: 0,
@@ -246,7 +246,7 @@ func buildPlatformAdmin() []client.Object {
 				Name: "beijing-PlatformAdmin",
 			},
 			Spec: v1alpha1.PlatformAdminSpec{
-				PoolName: "beijing",
+				NodePools: []string{"beijing"},
 			},
 		},
 	}
@@ -312,8 +312,8 @@ func Indexer(rawObj client.Object) []string {
 	if !ok {
 		return []string{}
 	}
-	if len(platformAdmin.Spec.PoolName) == 0 {
+	if len(platformAdmin.Spec.NodePools) == 0 {
 		return []string{}
 	}
-	return []string{platformAdmin.Spec.PoolName}
+	return platformAdmin.Spec.NodePools
 }

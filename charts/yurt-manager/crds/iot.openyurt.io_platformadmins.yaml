@@ -9133,8 +9133,10 @@ spec:
                 type: array
               imageRegistry:
                 type: string
-              poolName:
-                type: string
+              nodePools:
+                items:
+                    type: string
+                type: array
               serviceType:
                 description: Service Type string describes ingress methods for a service
                 type: string
@@ -9239,8 +9241,10 @@ spec:
                 type: string
               platform:
                 type: string
-              poolName:
-                type: string
+              nodepools:
+                items:
+                    type: string
+                type: array
               security:
                 type: boolean
               version:

@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	IndexerPathForNodepool = "spec.poolName"
+	IndexerPathForNodepools = "spec.nodePools"
 )
 
 var registerOnce sync.Once
@@ -35,10 +35,10 @@ func RegisterFieldIndexers(fi client.FieldIndexer) error {
 	var err error
 	registerOnce.Do(func() {
 		// register the fieldIndexer for device
-		if err = fi.IndexField(context.TODO(), &v1alpha2.PlatformAdmin{}, IndexerPathForNodepool, func(rawObj client.Object) []string {
+		if err = fi.IndexField(context.TODO(), &v1alpha2.PlatformAdmin{}, IndexerPathForNodepools, func(rawObj client.Object) []string {
 			platformAdmin, ok := rawObj.(*v1alpha2.PlatformAdmin)
 			if ok {
-				return []string{platformAdmin.Spec.PoolName}
+				return platformAdmin.Spec.NodePools
 			}
 			return []string{}
 		}); err != nil {

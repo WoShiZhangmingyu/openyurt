@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	unitv1beta1 "github.com/openyurtio/openyurt/pkg/apis/apps/v1beta1"
@@ -107,37 +106,47 @@ func (webhook *PlatformAdminHandler) validatePlatformAdminSpec(platformAdmin *v1
 }
 
 func (webhook *PlatformAdminHandler) validatePlatformAdminWithNodePools(ctx context.Context, platformAdmin *v1alpha2.PlatformAdmin) field.ErrorList {
-	// verify that the poolname is a right nodepool name
+	// verify that the poolnames are right nodepool names
 	nodePools := &unitv1beta1.NodePoolList{}
 	if err := webhook.Client.List(ctx, nodePools); err != nil {
 		return field.ErrorList{
-			field.Invalid(field.NewPath("spec", "poolName"), platformAdmin.Spec.PoolName, "can not list nodepools, cause"+err.Error()),
+			field.Invalid(field.NewPath("spec", "nodePools"), platformAdmin.Spec.NodePools, "can not list nodepools, cause "+err.Error()),
 		}
 	}
-	ok := false
+
+	nodePoolMap := make(map[string]bool)
 	for _, nodePool := range nodePools.Items {
-		if nodePool.ObjectMeta.Name == platformAdmin.Spec.PoolName {
-			ok = true
-			break
+		nodePoolMap[nodePool.ObjectMeta.Name] = true
+	}
+
+	invalidPools := []string{}
+	for _, poolName := range platformAdmin.Spec.NodePools {
+		if !nodePoolMap[poolName] {
+			invalidPools = append(invalidPools, poolName)
 		}
 	}
-	if !ok {
+	if len(invalidPools) > 0 {
 		return field.ErrorList{
-			field.Invalid(field.NewPath("spec", "poolName"), platformAdmin.Spec.PoolName, "can not find the nodepool"),
+			field.Invalid(field.NewPath("spec", "nodePools"), invalidPools, "can not find the nodepools"),
 		}
 	}
-	// verify that no other platformadmin in the nodepool
+
+	// verify that no other platformadmin in the nodepools
 	var platformadmins v1alpha2.PlatformAdminList
-	listOptions := client.MatchingFields{util.IndexerPathForNodepool: platformAdmin.Spec.PoolName}
-	if err := webhook.Client.List(ctx, &platformadmins, listOptions); err != nil {
+	if err := webhook.Client.List(ctx, &platformadmins); err != nil {
 		return field.ErrorList{
-			field.Invalid(field.NewPath("spec", "poolName"), platformAdmin.Spec.PoolName, "can not list platformadmins, cause "+err.Error()),
+			field.Invalid(field.NewPath("spec", "nodePools"), platformAdmin.Spec.NodePools, "can not list platformadmins, cause "+err.Error()),
 		}
 	}
+
 	for _, other := range platformadmins.Items {
 		if platformAdmin.Name != other.Name {
-			return field.ErrorList{
-				field.Invalid(field.NewPath("spec", "poolName"), platformAdmin.Spec.PoolName, "already used by other platformadmin instance,"),
+			for _, poolName := range platformAdmin.Spec.NodePools {
+				if util.Contains(other.Spec.NodePools, poolName) {
+					return field.ErrorList{
+						field.Invalid(field.NewPath("spec", "nodePools"), poolName, "already used by other platformadmin instance"),
+					}
+				}
 			}
 		}
 	}

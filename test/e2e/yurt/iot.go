@@ -92,7 +92,7 @@ var _ = Describe("OpenYurt IoT Test", Ordered, func() {
 			},
 			Spec: iotv1alpha2.PlatformAdminSpec{
 				Version:  version,
-				PoolName: nodePoolName,
+				NodePools: []string{nodePoolName},
 			},
 		}
 		Eventually(func() error {

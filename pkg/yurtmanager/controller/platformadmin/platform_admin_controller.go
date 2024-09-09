@@ -273,7 +273,7 @@ func (r *ReconcilePlatformAdmin) reconcileDelete(ctx context.Context, platformAd
 
 		newPools := make([]string, 0)
 		for _, poolName := range yas.Spec.Pools {
-			if poolName != platformAdmin.Spec.PoolName {
+			if !util.Contains(platformAdmin.Spec.NodePools, poolName) {
 				newPools = append(newPools, poolName)
 			}
 		}
@@ -283,7 +283,7 @@ func (r *ReconcilePlatformAdmin) reconcileDelete(ctx context.Context, platformAd
 		for _, tweak := range yas.Spec.Workload.WorkloadTweaks {
 			newTweakPools := make([]string, 0)
 			for _, poolName := range tweak.Pools {
-				if poolName != platformAdmin.Spec.PoolName {
+				if !util.Contains(platformAdmin.Spec.NodePools, poolName) {
 					newTweakPools = append(newTweakPools, poolName)
 				}
 			}
@@ -396,6 +396,7 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 	var (
 		readyComponent int32 = 0
 		needComponents       = make(map[string]struct{})
+		needServices         = make(map[string]struct{})
 	)
 
 	// TODO: The additional deployment and service of component is no longer supported in v1beta1.
@@ -425,7 +426,8 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 	for _, desiredComponent := range platformAdminFramework.Components {
 		readyService := false
 		readyDeployment := false
-		needComponents[desiredComponent.Name] = struct{}{}
+		needServices[desiredComponent.Name] = struct{}{}
+		needComponents[platformAdmin.Name+"-"+desiredComponent.Name] = struct{}{}
 
 		if _, err := r.handleService(ctx, platformAdmin, desiredComponent); err != nil {
 			return false, err
@@ -434,7 +436,7 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 
 		yas := &appsv1beta1.YurtAppSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      desiredComponent.Name,
+				Name:      platformAdmin.Name + "-" + desiredComponent.Name,
 				Namespace: platformAdmin.Namespace,
 			},
 		}
@@ -443,7 +445,7 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 			ctx,
 			types.NamespacedName{
 				Namespace: platformAdmin.Namespace,
-				Name:      desiredComponent.Name},
+				Name:      platformAdmin.Name + "-" + desiredComponent.Name},
 			yas)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
@@ -459,34 +461,36 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 			// Refresh the YurtAppSet according to the user-defined configuration
 			yas.Spec.WorkloadTemplate.DeploymentTemplate.Spec = *desiredComponent.Deployment
 
-			if slices.Contains(yas.Spec.Pools, platformAdmin.Spec.PoolName) {
-				if yas.Status.ReadyWorkloads == yas.Status.TotalWorkloads {
-					readyDeployment = true
-					if readyDeployment && readyService {
-						readyComponent++
+			for _, poolName := range platformAdmin.Spec.NodePools {
+				if slices.Contains(yas.Spec.Pools, poolName) {
+					if yas.Status.ReadyWorkloads == yas.Status.TotalWorkloads {
+						readyDeployment = true
+						if readyDeployment && readyService {
+							readyComponent++
+						}
 					}
 				}
-			}
 
-			pools := []string{platformAdmin.Spec.PoolName}
-			tweaks := []appsv1beta1.WorkloadTweak{
-				{
-					Pools: []string{platformAdmin.Spec.PoolName},
-					Tweaks: appsv1beta1.Tweaks{
-						Replicas: pointer.Int32(1),
+				pools := []string{poolName}
+				tweaks := []appsv1beta1.WorkloadTweak{
+					{
+						Pools: []string{poolName},
+						Tweaks: appsv1beta1.Tweaks{
+							Replicas: pointer.Int32(1),
+						},
 					},
-				},
-			}
-			flag := false
-			for _, name := range yas.Spec.Pools {
-				if name == platformAdmin.Spec.PoolName {
-					flag = true
-					break
 				}
-			}
-			if !flag {
-				yas.Spec.Pools = append(yas.Spec.Pools, pools...)
-				yas.Spec.Workload.WorkloadTweaks = append(yas.Spec.Workload.WorkloadTweaks, tweaks...)
+				flag := false
+				for _, name := range yas.Spec.Pools {
+					if name == poolName {
+						flag = true
+						break
+					}
+				}
+				if !flag {
+					yas.Spec.Pools = append(yas.Spec.Pools, pools...)
+					yas.Spec.Workload.WorkloadTweaks = append(yas.Spec.Workload.WorkloadTweaks, tweaks...)
+				}
 			}
 			if err := controllerutil.SetOwnerReference(platformAdmin, yas, r.Scheme()); err != nil {
 				return false, err
@@ -502,7 +506,7 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 	servicelist := &corev1.ServiceList{}
 	if err := r.List(ctx, servicelist, client.InNamespace(platformAdmin.Namespace), client.MatchingLabels{iotv1alpha2.LabelPlatformAdminGenerate: LabelService}); err == nil {
 		for _, s := range servicelist.Items {
-			if _, ok := needComponents[s.Name]; !ok {
+			if _, ok := needServices[s.Name]; !ok {
 				r.removeOwner(ctx, platformAdmin, &s)
 			}
 		}
@@ -567,7 +571,7 @@ func (r *ReconcilePlatformAdmin) handleYurtAppSet(ctx context.Context, platformA
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      make(map[string]string),
 			Annotations: make(map[string]string),
-			Name:        component.Name,
+			Name:        platformAdmin.Name + "-" + component.Name,
 			Namespace:   platformAdmin.Namespace,
 		},
 		Spec: appsv1beta1.YurtAppSetSpec{
@@ -585,10 +589,22 @@ func (r *ReconcilePlatformAdmin) handleYurtAppSet(ctx context.Context, platformA
 	}
 
 	yas.Labels[iotv1alpha2.LabelPlatformAdminGenerate] = LabelDeployment
-	yas.Spec.Pools = []string{platformAdmin.Spec.PoolName}
+	yas.Spec.Pools = platformAdmin.Spec.NodePools
+	for _, nodePool := range platformAdmin.Spec.NodePools {
+		exists := false
+		for _, pool := range yas.Spec.Pools {
+			if pool == nodePool {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			yas.Spec.Pools = append(yas.Spec.Pools, nodePool)
+		}
+	}
 	yas.Spec.Workload.WorkloadTweaks = []appsv1beta1.WorkloadTweak{
 		{
-			Pools: []string{platformAdmin.Spec.PoolName},
+			Pools: yas.Spec.Pools,
 			Tweaks: appsv1beta1.Tweaks{
 				Replicas: pointer.Int32(1),
 			},
