@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,20 +27,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	unitv1beta1 "github.com/openyurtio/openyurt/pkg/apis/apps/v1beta1"
-	"github.com/openyurtio/openyurt/pkg/apis/iot/v1alpha1"
+	"github.com/openyurtio/openyurt/pkg/apis/iot/v1beta1"
+	"github.com/openyurtio/openyurt/pkg/yurtmanager/controller/platformadmin/config"
 	util "github.com/openyurtio/openyurt/pkg/yurtmanager/controller/platformadmin/utils"
 )
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type.
 func (webhook *PlatformAdminHandler) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	platformAdmin, ok := obj.(*v1alpha1.PlatformAdmin)
+	platformAdmin, ok := obj.(*v1beta1.PlatformAdmin)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a PlatformAdmin but got a %T", obj))
 	}
 
 	//validate
 	if allErrs := webhook.validate(ctx, platformAdmin); len(allErrs) > 0 {
-		return nil, apierrors.NewInvalid(v1alpha1.GroupVersion.WithKind("PlatformAdmin").GroupKind(), platformAdmin.Name, allErrs)
+		return nil, apierrors.NewInvalid(v1beta1.GroupVersion.WithKind("PlatformAdmin").GroupKind(), platformAdmin.Name, allErrs)
 	}
 
 	return nil, nil
@@ -47,11 +49,11 @@ func (webhook *PlatformAdminHandler) ValidateCreate(ctx context.Context, obj run
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type.
 func (webhook *PlatformAdminHandler) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	newPlatformAdmin, ok := newObj.(*v1alpha1.PlatformAdmin)
+	newPlatformAdmin, ok := newObj.(*v1beta1.PlatformAdmin)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a PlatformAdmin but got a %T", newObj))
 	}
-	oldPlatformAdmin, ok := oldObj.(*v1alpha1.PlatformAdmin)
+	oldPlatformAdmin, ok := oldObj.(*v1beta1.PlatformAdmin)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected a PlatformAdmin but got a %T", oldObj))
 	}
@@ -60,7 +62,7 @@ func (webhook *PlatformAdminHandler) ValidateUpdate(ctx context.Context, oldObj,
 	newErrorList := webhook.validate(ctx, newPlatformAdmin)
 	oldErrorList := webhook.validate(ctx, oldPlatformAdmin)
 	if allErrs := append(newErrorList, oldErrorList...); len(allErrs) > 0 {
-		return nil, apierrors.NewInvalid(v1alpha1.GroupVersion.WithKind("PlatformAdmin").GroupKind(), newPlatformAdmin.Name, allErrs)
+		return nil, apierrors.NewInvalid(v1beta1.GroupVersion.WithKind("PlatformAdmin").GroupKind(), newPlatformAdmin.Name, allErrs)
 	}
 	return nil, nil
 }
@@ -70,7 +72,12 @@ func (webhook *PlatformAdminHandler) ValidateDelete(_ context.Context, obj runti
 	return nil, nil
 }
 
-func (webhook *PlatformAdminHandler) validate(ctx context.Context, platformAdmin *v1alpha1.PlatformAdmin) field.ErrorList {
+func (webhook *PlatformAdminHandler) validate(ctx context.Context, platformAdmin *v1beta1.PlatformAdmin) field.ErrorList {
+	// verify the version
+	if specErrs := webhook.validatePlatformAdminSpec(platformAdmin); specErrs != nil {
+		return specErrs
+	}
+
 	// verify that the poolname nodepool
 	if nodePoolErrs := webhook.validatePlatformAdminWithNodePools(ctx, platformAdmin); nodePoolErrs != nil {
 		return nodePoolErrs
@@ -78,17 +85,37 @@ func (webhook *PlatformAdminHandler) validate(ctx context.Context, platformAdmin
 	return nil
 }
 
-func (webhook *PlatformAdminHandler) validatePlatformAdminWithNodePools(ctx context.Context, platformAdmin *v1alpha1.PlatformAdmin) field.ErrorList {
+func (webhook *PlatformAdminHandler) validatePlatformAdminSpec(platformAdmin *v1beta1.PlatformAdmin) field.ErrorList {
+	// TODO: Need to divert traffic based on the type of platform
+
+	// Verify that the platform is supported
+	if platformAdmin.Spec.Platform != v1beta1.PlatformAdminPlatformEdgeX {
+		return field.ErrorList{field.Invalid(field.NewPath("spec", "platform"), platformAdmin.Spec.Platform, "must be "+v1beta1.PlatformAdminPlatformEdgeX)}
+	}
+
+	// Verify that it is a supported platformadmin version
+	for _, version := range webhook.Manifests.Versions {
+		if platformAdmin.Spec.Version == version.Name {
+			return nil
+		}
+	}
+
+	return field.ErrorList{
+		field.Invalid(field.NewPath("spec", "version"), platformAdmin.Spec.Version, "must be one of"+strings.Join(config.ExtractVersionsName(webhook.Manifests).UnsortedList(), ",")),
+	}
+}
+
+func (webhook *PlatformAdminHandler) validatePlatformAdminWithNodePools(ctx context.Context, platformAdmin *v1beta1.PlatformAdmin) field.ErrorList {
 	// verify that the poolnames are right nodepool names
-	nodePools := &unitv1beta1.NodePoolList{}
-	if err := webhook.Client.List(ctx, nodePools); err != nil {
+	nodepools := &unitv1beta1.NodePoolList{}
+	if err := webhook.Client.List(ctx, nodepools); err != nil {
 		return field.ErrorList{
-			field.Invalid(field.NewPath("spec", "nodePools"), platformAdmin.Spec.NodePools, "can not list nodepools, cause"+err.Error()),
+			field.Invalid(field.NewPath("spec", "nodepools"), platformAdmin.Spec.NodePools, "can not list nodepools, cause"+err.Error()),
 		}
 	}
 
 	nodePoolMap := make(map[string]bool)
-	for _, nodePool := range nodePools.Items {
+	for _, nodePool := range nodepools.Items {
 		nodePoolMap[nodePool.ObjectMeta.Name] = true
 	}
 
@@ -100,15 +127,15 @@ func (webhook *PlatformAdminHandler) validatePlatformAdminWithNodePools(ctx cont
 	}
 	if len(invalidPools) > 0 {
 		return field.ErrorList{
-			field.Invalid(field.NewPath("spec", "nodePools"), invalidPools, "can not find the nodepools"),
+			field.Invalid(field.NewPath("spec", "nodepools"), invalidPools, "can not find the nodepools"),
 		}
 	}
 
 	// verify that no other platformadmin in the nodepools
-	var platformadmins v1alpha1.PlatformAdminList
+	var platformadmins v1beta1.PlatformAdminList
 	if err := webhook.Client.List(ctx, &platformadmins); err != nil {
 		return field.ErrorList{
-			field.Invalid(field.NewPath("spec", "nodePools"), platformAdmin.Spec.NodePools, "can not list platformadmins, cause"+err.Error()),
+			field.Invalid(field.NewPath("spec", "nodepools"), platformAdmin.Spec.NodePools, "can not list platformadmins, cause"+err.Error()),
 		}
 	}
 
@@ -117,7 +144,7 @@ func (webhook *PlatformAdminHandler) validatePlatformAdminWithNodePools(ctx cont
 			for _, poolName := range platformAdmin.Spec.NodePools {
 				if util.Contains(other.Spec.NodePools, poolName) {
 					return field.ErrorList{
-						field.Invalid(field.NewPath("spec", "nodePools"), poolName, "already used by other platformadmin instance"),
+						field.Invalid(field.NewPath("spec", "nodepools"), poolName, "already used by other platformadmin instance"),
 					}
 				}
 			}

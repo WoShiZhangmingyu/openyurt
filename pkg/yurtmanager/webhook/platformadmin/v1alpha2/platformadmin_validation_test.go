@@ -107,7 +107,7 @@ func TestValidateCreate(t *testing.T) {
 			obj: &v1alpha2.PlatformAdmin{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"not-exit-poll"},
+					PoolName: "not-exit-poll",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -120,7 +120,7 @@ func TestValidateCreate(t *testing.T) {
 			obj: &v1alpha2.PlatformAdmin{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"beijing"},
+					PoolName: "beijing",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -135,7 +135,7 @@ func TestValidateCreate(t *testing.T) {
 					Name: "hangzhou-PlatformAdmin",
 				},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"beijing"},
+					PoolName: "beijing",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -150,7 +150,7 @@ func TestValidateCreate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"beijing"},
+					PoolName: "beijing",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -217,7 +217,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"beijing"},
+					PoolName: "beijing",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -234,7 +234,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"beijing"},
+					PoolName: "beijing",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -249,7 +249,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"beijing"},
+					PoolName: "beijing",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -259,7 +259,7 @@ func TestValidateUpdate(t *testing.T) {
 					Name: "beijing-PlatformAdmin",
 				},
 				Spec: v1alpha2.PlatformAdminSpec{
-					NodePools: []string{"beijing"},
+					PoolName: "beijing",
 					Platform: v1alpha2.PlatformAdminPlatformEdgeX,
 					Version:  "v2",
 				},
@@ -313,7 +313,7 @@ func buildPlatformAdmin() []client.Object {
 				Name: "beijing-PlatformAdmin",
 			},
 			Spec: v1alpha2.PlatformAdminSpec{
-				NodePools: []string{"beijing"},
+				PoolName: "beijing",
 			},
 		},
 	}
@@ -379,8 +379,8 @@ func Indexer(rawObj client.Object) []string {
 	if !ok {
 		return []string{}
 	}
-	if len(platformAdmin.Spec.NodePools) == 0 {
+	if len(platformAdmin.Spec.PoolName) == 0 {
 		return []string{}
 	}
-	return platformAdmin.Spec.NodePools
+	return []string{platformAdmin.Spec.PoolName}
 }

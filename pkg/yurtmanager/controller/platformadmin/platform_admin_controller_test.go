@@ -11,6 +11,7 @@ import (
 	"github.com/openyurtio/openyurt/pkg/apis"
 	"github.com/openyurtio/openyurt/pkg/apis/apps/v1beta1"
 	"github.com/openyurtio/openyurt/pkg/apis/iot/v1alpha2"
+	iotv1beta1 "github.com/openyurtio/openyurt/pkg/apis/iot/v1beta1"
 	"github.com/openyurtio/openyurt/pkg/yurtmanager/controller/platformadmin/config"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +49,7 @@ func TestReconcilePlatformAdmin(t *testing.T) {
 	tests := []struct {
 		name           string
 		request        reconcile.Request
-		platformAdmin  *v1alpha2.PlatformAdmin
+		platformAdmin  *iotv1beta1.PlatformAdmin
 		yasList        []*v1beta1.YurtAppSet
 		svcList        []*corev1.Service
 		expectedYasNum int
@@ -64,12 +65,12 @@ func TestReconcilePlatformAdmin(t *testing.T) {
 					Namespace: "default",
 				},
 			},
-			platformAdmin: &v1alpha2.PlatformAdmin{
+			platformAdmin: &iotv1beta1.PlatformAdmin{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-platformadmin",
 					Namespace: "default",
 				},
-				Spec: v1alpha2.PlatformAdminSpec{
+				Spec: iotv1beta1.PlatformAdminSpec{
 					Version:   "minnesota",
 					NodePools: []string{"pool1"},
 				},
@@ -86,12 +87,12 @@ func TestReconcilePlatformAdmin(t *testing.T) {
 					Namespace: "default",
 				},
 			},
-			platformAdmin: &v1alpha2.PlatformAdmin{
+			platformAdmin: &iotv1beta1.PlatformAdmin{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "multi-pool-platformadmin",
 					Namespace: "default",
 				},
-				Spec: v1alpha2.PlatformAdminSpec{
+				Spec: iotv1beta1.PlatformAdminSpec{
 					Version:   "minnesota",
 					NodePools: []string{"pool1", "pool2", "pool3", "pool4"},
 				},
@@ -108,12 +109,12 @@ func TestReconcilePlatformAdmin(t *testing.T) {
 					Namespace: "default",
 				},
 			},
-			platformAdmin: &v1alpha2.PlatformAdmin{
+			platformAdmin: &iotv1beta1.PlatformAdmin{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "multi-pool-platformadmin",
 					Namespace: "default",
 				},
-				Spec: v1alpha2.PlatformAdminSpec{
+				Spec: iotv1beta1.PlatformAdminSpec{
 					Version:   "minnesota",
 					NodePools: []string{},
 				},

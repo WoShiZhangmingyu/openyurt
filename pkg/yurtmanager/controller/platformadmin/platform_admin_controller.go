@@ -49,7 +49,8 @@ import (
 	"github.com/openyurtio/openyurt/cmd/yurt-manager/names"
 	appsv1beta1 "github.com/openyurtio/openyurt/pkg/apis/apps/v1beta1"
 	iotv1alpha1 "github.com/openyurtio/openyurt/pkg/apis/iot/v1alpha1"
-	iotv1alpha2 "github.com/openyurtio/openyurt/pkg/apis/iot/v1alpha2"
+//	iotv1alpha2 "github.com/openyurtio/openyurt/pkg/apis/iot/v1alpha2"
+	iotv1beta1  "github.com/openyurtio/openyurt/pkg/apis/iot/v1beta1"
 	"github.com/openyurtio/openyurt/pkg/yurtmanager/controller/platformadmin/config"
 	util "github.com/openyurtio/openyurt/pkg/yurtmanager/controller/platformadmin/utils"
 )
@@ -60,7 +61,7 @@ func Format(format string, args ...interface{}) string {
 }
 
 var (
-	controllerResource = iotv1alpha2.SchemeGroupVersion.WithResource("platformadmins")
+	controllerResource = iotv1beta1.SchemeGroupVersion.WithResource("platformadmins")
 )
 
 const (
@@ -146,25 +147,25 @@ func add(mgr manager.Manager, cfg *appconfig.CompletedConfig, r reconcile.Reconc
 	}
 
 	// Watch for changes to PlatformAdmin
-	err = c.Watch(source.Kind(mgr.GetCache(), &iotv1alpha2.PlatformAdmin{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &iotv1beta1.PlatformAdmin{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.ConfigMap{}),
-		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &iotv1alpha2.PlatformAdmin{}, handler.OnlyControllerOwner()))
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &iotv1beta1.PlatformAdmin{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Service{}),
-		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &iotv1alpha2.PlatformAdmin{}, handler.OnlyControllerOwner()))
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &iotv1beta1.PlatformAdmin{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.YurtAppSet{}),
-		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &iotv1alpha2.PlatformAdmin{}, handler.OnlyControllerOwner()))
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &iotv1beta1.PlatformAdmin{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		return err
 	}
@@ -194,7 +195,7 @@ func (r *ReconcilePlatformAdmin) Reconcile(ctx context.Context, request reconcil
 	klog.Infof(Format("Reconcile PlatformAdmin %s/%s", request.Namespace, request.Name))
 
 	// Fetch the PlatformAdmin instance
-	platformAdmin := &iotv1alpha2.PlatformAdmin{}
+	platformAdmin := &iotv1beta1.PlatformAdmin{}
 	if err := r.Get(ctx, request.NamespacedName, platformAdmin); err != nil {
 		if apierrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
@@ -212,10 +213,10 @@ func (r *ReconcilePlatformAdmin) Reconcile(ctx context.Context, request reconcil
 		if !*isDeleted {
 			// Finally check whether PlatformAdmin is Ready
 			platformAdminStatus.Ready = true
-			if cond := util.GetPlatformAdminCondition(*platformAdminStatus, iotv1alpha2.ConfigmapAvailableCondition); cond.Status == corev1.ConditionFalse {
+			if cond := util.GetPlatformAdminCondition(*platformAdminStatus, iotv1beta1.ConfigmapAvailableCondition); cond.Status == corev1.ConditionFalse {
 				platformAdminStatus.Ready = false
 			}
-			if cond := util.GetPlatformAdminCondition(*platformAdminStatus, iotv1alpha2.ComponentAvailableCondition); cond.Status == corev1.ConditionFalse {
+			if cond := util.GetPlatformAdminCondition(*platformAdminStatus, iotv1beta1.ComponentAvailableCondition); cond.Status == corev1.ConditionFalse {
 				platformAdminStatus.Ready = false
 			}
 			if platformAdminStatus.UnreadyComponentNum != 0 {
@@ -243,7 +244,7 @@ func (r *ReconcilePlatformAdmin) Reconcile(ctx context.Context, request reconcil
 	return r.reconcileNormal(ctx, platformAdmin, platformAdminStatus)
 }
 
-func (r *ReconcilePlatformAdmin) reconcileDelete(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin) (reconcile.Result, error) {
+func (r *ReconcilePlatformAdmin) reconcileDelete(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin) (reconcile.Result, error) {
 	klog.V(4).Infof(Format("ReconcileDelete PlatformAdmin %s/%s", platformAdmin.Namespace, platformAdmin.Name))
 	yas := &appsv1beta1.YurtAppSet{}
 
@@ -302,7 +303,7 @@ func (r *ReconcilePlatformAdmin) reconcileDelete(ctx context.Context, platformAd
 		}
 	}
 
-	controllerutil.RemoveFinalizer(platformAdmin, iotv1alpha2.PlatformAdminFinalizer)
+	controllerutil.RemoveFinalizer(platformAdmin, iotv1beta1.PlatformAdminFinalizer)
 	if err := r.Client.Update(ctx, platformAdmin); err != nil {
 		klog.Errorf(Format("Update PlatformAdmin %s error %v", klog.KObj(platformAdmin), err))
 		return reconcile.Result{}, err
@@ -311,9 +312,9 @@ func (r *ReconcilePlatformAdmin) reconcileDelete(ctx context.Context, platformAd
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcilePlatformAdmin) reconcileNormal(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, platformAdminStatus *iotv1alpha2.PlatformAdminStatus) (reconcile.Result, error) {
+func (r *ReconcilePlatformAdmin) reconcileNormal(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, platformAdminStatus *iotv1beta1.PlatformAdminStatus) (reconcile.Result, error) {
 	klog.V(4).Infof(Format("ReconcileNormal PlatformAdmin %s/%s", platformAdmin.Namespace, platformAdmin.Name))
-	controllerutil.AddFinalizer(platformAdmin, iotv1alpha2.PlatformAdminFinalizer)
+	controllerutil.AddFinalizer(platformAdmin, iotv1beta1.PlatformAdminFinalizer)
 
 	platformAdminStatus.Initialized = true
 
@@ -329,27 +330,27 @@ func (r *ReconcilePlatformAdmin) reconcileNormal(ctx context.Context, platformAd
 	klog.V(4).Infof(Format("ReconcileConfigmap PlatformAdmin %s/%s", platformAdmin.Namespace, platformAdmin.Name))
 	if ok, err := r.reconcileConfigmap(ctx, platformAdmin, platformAdminStatus, platformAdminFramework); !ok {
 		if err != nil {
-			util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1alpha2.ConfigmapAvailableCondition, corev1.ConditionFalse, iotv1alpha2.ConfigmapProvisioningFailedReason, err.Error()))
+			util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1beta1.ConfigmapAvailableCondition, corev1.ConditionFalse, iotv1beta1.ConfigmapProvisioningFailedReason, err.Error()))
 			return reconcile.Result{}, errors.Wrapf(err,
 				"unexpected error while reconciling configmap for %s", platformAdmin.Namespace+"/"+platformAdmin.Name)
 		}
-		util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1alpha2.ConfigmapAvailableCondition, corev1.ConditionFalse, iotv1alpha2.ConfigmapProvisioningReason, ""))
+		util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1beta1.ConfigmapAvailableCondition, corev1.ConditionFalse, iotv1beta1.ConfigmapProvisioningReason, ""))
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
-	util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1alpha2.ConfigmapAvailableCondition, corev1.ConditionTrue, "", ""))
+	util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1beta1.ConfigmapAvailableCondition, corev1.ConditionTrue, "", ""))
 
 	// Reconcile component of edgex confiruation
 	klog.V(4).Infof(Format("ReconcileComponent PlatformAdmin %s/%s", platformAdmin.Namespace, platformAdmin.Name))
 	if ok, err := r.reconcileComponent(ctx, platformAdmin, platformAdminStatus, platformAdminFramework); !ok {
 		if err != nil {
-			util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1alpha2.ComponentAvailableCondition, corev1.ConditionFalse, iotv1alpha2.ComponentProvisioningReason, err.Error()))
+			util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1beta1.ComponentAvailableCondition, corev1.ConditionFalse, iotv1beta1.ComponentProvisioningReason, err.Error()))
 			return reconcile.Result{}, errors.Wrapf(err,
 				"unexpected error while reconciling component for %s", platformAdmin.Namespace+"/"+platformAdmin.Name)
 		}
-		util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1alpha2.ComponentAvailableCondition, corev1.ConditionFalse, iotv1alpha2.ComponentProvisioningReason, ""))
+		util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1beta1.ComponentAvailableCondition, corev1.ConditionFalse, iotv1beta1.ComponentProvisioningReason, ""))
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
-	util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1alpha2.ComponentAvailableCondition, corev1.ConditionTrue, "", ""))
+	util.SetPlatformAdminCondition(platformAdminStatus, util.NewPlatformAdminCondition(iotv1beta1.ComponentAvailableCondition, corev1.ConditionTrue, "", ""))
 
 	// Update the metadata of PlatformAdmin
 	if err := r.Client.Update(ctx, platformAdmin); err != nil {
@@ -360,7 +361,7 @@ func (r *ReconcilePlatformAdmin) reconcileNormal(ctx context.Context, platformAd
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcilePlatformAdmin) reconcileConfigmap(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, _ *iotv1alpha2.PlatformAdminStatus, platformAdminFramework *PlatformAdminFramework) (bool, error) {
+func (r *ReconcilePlatformAdmin) reconcileConfigmap(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, _ *iotv1beta1.PlatformAdminStatus, platformAdminFramework *PlatformAdminFramework) (bool, error) {
 	var configmaps []corev1.ConfigMap
 	needConfigMaps := make(map[string]struct{})
 	configmaps = platformAdminFramework.ConfigMaps
@@ -368,7 +369,7 @@ func (r *ReconcilePlatformAdmin) reconcileConfigmap(ctx context.Context, platfor
 	for i, configmap := range configmaps {
 		configmap.Namespace = platformAdmin.Namespace
 		configmap.Labels = make(map[string]string)
-		configmap.Labels[iotv1alpha2.LabelPlatformAdminGenerate] = LabelConfigmap
+		configmap.Labels[iotv1beta1.LabelPlatformAdminGenerate] = LabelConfigmap
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, &configmap, func() error {
 			configmap.Data = platformAdminFramework.ConfigMaps[i].Data
 			return controllerutil.SetOwnerReference(platformAdmin, &configmap, (r.Scheme()))
@@ -381,7 +382,7 @@ func (r *ReconcilePlatformAdmin) reconcileConfigmap(ctx context.Context, platfor
 	}
 
 	configmaplist := &corev1.ConfigMapList{}
-	if err := r.List(ctx, configmaplist, client.InNamespace(platformAdmin.Namespace), client.MatchingLabels{iotv1alpha2.LabelPlatformAdminGenerate: LabelConfigmap}); err == nil {
+	if err := r.List(ctx, configmaplist, client.InNamespace(platformAdmin.Namespace), client.MatchingLabels{iotv1beta1.LabelPlatformAdminGenerate: LabelConfigmap}); err == nil {
 		for _, c := range configmaplist.Items {
 			if _, ok := needConfigMaps[c.Name]; !ok {
 				r.removeOwner(ctx, platformAdmin, &c)
@@ -392,7 +393,7 @@ func (r *ReconcilePlatformAdmin) reconcileConfigmap(ctx context.Context, platfor
 	return true, nil
 }
 
-func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, platformAdminStatus *iotv1alpha2.PlatformAdminStatus, platformAdminFramework *PlatformAdminFramework) (bool, error) {
+func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, platformAdminStatus *iotv1beta1.PlatformAdminStatus, platformAdminFramework *PlatformAdminFramework) (bool, error) {
 	var (
 		readyComponent int32 = 0
 		needComponents       = make(map[string]struct{})
@@ -504,7 +505,7 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 
 	// Remove the service owner that we do not need
 	servicelist := &corev1.ServiceList{}
-	if err := r.List(ctx, servicelist, client.InNamespace(platformAdmin.Namespace), client.MatchingLabels{iotv1alpha2.LabelPlatformAdminGenerate: LabelService}); err == nil {
+	if err := r.List(ctx, servicelist, client.InNamespace(platformAdmin.Namespace), client.MatchingLabels{iotv1beta1.LabelPlatformAdminGenerate: LabelService}); err == nil {
 		for _, s := range servicelist.Items {
 			if _, ok := needServices[s.Name]; !ok {
 				r.removeOwner(ctx, platformAdmin, &s)
@@ -514,7 +515,7 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 
 	// Remove the yurtappset owner that we do not need
 	yurtappsetlist := &appsv1beta1.YurtAppSetList{}
-	if err := r.List(ctx, yurtappsetlist, client.InNamespace(platformAdmin.Namespace), client.MatchingLabels{iotv1alpha2.LabelPlatformAdminGenerate: LabelDeployment}); err == nil {
+	if err := r.List(ctx, yurtappsetlist, client.InNamespace(platformAdmin.Namespace), client.MatchingLabels{iotv1beta1.LabelPlatformAdminGenerate: LabelDeployment}); err == nil {
 		for _, s := range yurtappsetlist.Items {
 			if _, ok := needComponents[s.Name]; !ok {
 				r.removeOwner(ctx, platformAdmin, &s)
@@ -525,7 +526,7 @@ func (r *ReconcilePlatformAdmin) reconcileComponent(ctx context.Context, platfor
 	return readyComponent == int32(len(platformAdminFramework.Components)), nil
 }
 
-func (r *ReconcilePlatformAdmin) handleService(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, component *config.Component) (*corev1.Service, error) {
+func (r *ReconcilePlatformAdmin) handleService(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, component *config.Component) (*corev1.Service, error) {
 	// It is possible that the component does not need service.
 	// Therefore, you need to be careful when calling this function.
 	// It is still possible for service to be nil when there is no error!
@@ -541,7 +542,7 @@ func (r *ReconcilePlatformAdmin) handleService(ctx context.Context, platformAdmi
 			Namespace:   platformAdmin.Namespace,
 		},
 	}
-	service.Labels[iotv1alpha2.LabelPlatformAdminGenerate] = LabelService
+	service.Labels[iotv1beta1.LabelPlatformAdminGenerate] = LabelService
 	service.Annotations[AnnotationServiceTopologyKey] = AnnotationServiceTopologyValueNodePool
 
 	_, err := controllerutil.CreateOrUpdate(
@@ -559,7 +560,7 @@ func (r *ReconcilePlatformAdmin) handleService(ctx context.Context, platformAdmi
 	return service, nil
 }
 
-func (r *ReconcilePlatformAdmin) handleYurtAppSet(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, component *config.Component) (*appsv1beta1.YurtAppSet, error) {
+func (r *ReconcilePlatformAdmin) handleYurtAppSet(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, component *config.Component) (*appsv1beta1.YurtAppSet, error) {
 	// It is possible that the component does not need deployment.
 	// Therefore, you need to be careful when calling this function.
 	// It is still possible for deployment to be nil when there is no error!
@@ -588,7 +589,7 @@ func (r *ReconcilePlatformAdmin) handleYurtAppSet(ctx context.Context, platformA
 		},
 	}
 
-	yas.Labels[iotv1alpha2.LabelPlatformAdminGenerate] = LabelDeployment
+	yas.Labels[iotv1beta1.LabelPlatformAdminGenerate] = LabelDeployment
 	yas.Spec.Pools = platformAdmin.Spec.NodePools
 	for _, nodePool := range platformAdmin.Spec.NodePools {
 		exists := false
@@ -619,7 +620,7 @@ func (r *ReconcilePlatformAdmin) handleYurtAppSet(ctx context.Context, platformA
 	return yas, nil
 }
 
-func (r *ReconcilePlatformAdmin) removeOwner(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, obj client.Object) error {
+func (r *ReconcilePlatformAdmin) removeOwner(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, obj client.Object) error {
 	owners := obj.GetOwnerReferences()
 
 	for i, owner := range owners {
@@ -691,7 +692,7 @@ func annotationToComponent(annotation map[string]string) ([]*config.Component, e
 	return components, nil
 }
 
-func (r *ReconcilePlatformAdmin) readFramework(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin) (*PlatformAdminFramework, error) {
+func (r *ReconcilePlatformAdmin) readFramework(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin) (*PlatformAdminFramework, error) {
 	klog.V(6).Infof(Format("Synchronize the customize framework information for PlatformAdmin %s/%s", platformAdmin.Namespace, platformAdmin.Name))
 
 	// Try to get the configmap that represents the framework
@@ -758,7 +759,7 @@ func (r *ReconcilePlatformAdmin) readFramework(ctx context.Context, platformAdmi
 	return platformAdminFramework, nil
 }
 
-func (r *ReconcilePlatformAdmin) writeFramework(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, platformAdminFramework *PlatformAdminFramework) error {
+func (r *ReconcilePlatformAdmin) writeFramework(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, platformAdminFramework *PlatformAdminFramework) error {
 	// For better serialization, the serialization method of the Kubernetes runtime library is used
 	data, err := runtime.Encode(r.yamlSerializer, platformAdminFramework)
 	if err != nil {
@@ -796,7 +797,7 @@ func (r *ReconcilePlatformAdmin) writeFramework(ctx context.Context, platformAdm
 }
 
 // initFramework initializes the framework information for PlatformAdmin
-func (r *ReconcilePlatformAdmin) initFramework(ctx context.Context, platformAdmin *iotv1alpha2.PlatformAdmin, platformAdminFramework *PlatformAdminFramework) error {
+func (r *ReconcilePlatformAdmin) initFramework(ctx context.Context, platformAdmin *iotv1beta1.PlatformAdmin, platformAdminFramework *PlatformAdminFramework) error {
 	klog.V(6).Infof(Format("Initializes the standard framework information for PlatformAdmin %s/%s", platformAdmin.Namespace, platformAdmin.Name))
 
 	// Use standard configurations to build the framework
@@ -824,7 +825,7 @@ func (r *ReconcilePlatformAdmin) initFramework(ctx context.Context, platformAdmi
 		},
 	}
 	cm.Labels = make(map[string]string)
-	cm.Labels[iotv1alpha2.LabelPlatformAdminGenerate] = LabelFramework
+	cm.Labels[iotv1beta1.LabelPlatformAdminGenerate] = LabelFramework
 	cm.Data = make(map[string]string)
 	cm.Data["framework"] = string(data)
 	// Creates configmap on behalf of the framework, which is called only once upon creation
@@ -842,7 +843,7 @@ func (r *ReconcilePlatformAdmin) initFramework(ctx context.Context, platformAdmi
 }
 
 // calculateDesiredComponents calculates the components that need to be added and determines whether the framework needs to be rewritten
-func (r *ReconcilePlatformAdmin) calculateDesiredComponents(platformAdmin *iotv1alpha2.PlatformAdmin, platformAdminFramework *PlatformAdminFramework, additionalComponents []*config.Component) bool {
+func (r *ReconcilePlatformAdmin) calculateDesiredComponents(platformAdmin *iotv1beta1.PlatformAdmin, platformAdminFramework *PlatformAdminFramework, additionalComponents []*config.Component) bool {
 	needWriteFramework := false
 	desiredComponents := []*config.Component{}
 

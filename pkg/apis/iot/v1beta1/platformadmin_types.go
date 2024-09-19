@@ -14,35 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	// name of finalizer
-	EdgexFinalizer = "edgex.edgexfoundry.org"
+	PlatformAdminFinalizer = "iot.openyurt.io"
 
-	LabelEdgeXGenerate = "www.edgexfoundry.org/generate"
+	LabelPlatformAdminGenerate = "iot.openyurt.io/generate"
 )
 
-// PlatformAdminConditionType indicates valid conditions type of a iot platform.
+// PlatformAdmin platform supported by openyurt
+const (
+	PlatformAdminPlatformEdgeX = "edgex"
+)
+
+// PlatformAdminConditionType indicates valid conditions type of a PlatformAdmin.
 type PlatformAdminConditionType string
 type PlatformAdminConditionSeverity string
 
-// DeploymentTemplateSpec defines the pool template of Deployment.
-type DeploymentTemplateSpec struct {
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              appsv1.DeploymentSpec `json:"spec"`
-}
-
-// DeploymentTemplateSpec defines the pool template of Deployment.
-type ServiceTemplateSpec struct {
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              corev1.ServiceSpec `json:"spec"`
+// Component defines the components of EdgeX
+type Component struct {
+	Name string `json:"name"`
 }
 
 // PlatformAdminSpec defines the desired state of PlatformAdmin
@@ -51,30 +48,31 @@ type PlatformAdminSpec struct {
 
 	ImageRegistry string `json:"imageRegistry,omitempty"`
 
-	PoolName string `json:"poolName,omitempty"`
-
-	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
-	// +optional
-	AdditionalService []ServiceTemplateSpec `json:"additionalServices,omitempty"`
+	NodePools []string `json:"nodepools,omitempty"`
 
 	// +optional
-	AdditionalDeployment []DeploymentTemplateSpec `json:"additionalDeployments,omitempty"`
+	Platform string `json:"platform,omitempty"`
+
+	// +optional
+	Components []Component `json:"components,omitempty"`
+
+	// +optional
+	Security bool `json:"security,omitempty"`
 }
 
 // PlatformAdminStatus defines the observed state of PlatformAdmin
 type PlatformAdminStatus struct {
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
 	// +optional
 	Initialized bool `json:"initialized,omitempty"`
+
 	// +optional
-	ServiceReplicas int32 `json:"serviceReplicas,omitempty"`
+	ReadyComponentNum int32 `json:"readyComponentNum,omitempty"`
+
 	// +optional
-	ServiceReadyReplicas int32 `json:"serviceReadyReplicas,omitempty"`
-	// +optional
-	DeploymentReplicas int32 `json:"deploymentReplicas,omitempty"`
-	// +optional
-	DeploymentReadyReplicas int32 `json:"deploymentReadyReplicas,omitempty"`
+	UnreadyComponentNum int32 `json:"unreadyComponentNum,omitempty"`
 
 	// Current PlatformAdmin state
 	// +optional
@@ -104,13 +102,10 @@ type PlatformAdminCondition struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Namespaced,path=platformadmins,shortName=pa,categories=all
-// +kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="The platform ready status"
-// +kubebuilder:printcolumn:name="Service",type="integer",JSONPath=".status.serviceReplicas",description="The Service Replica."
-// +kubebuilder:printcolumn:name="ReadyService",type="integer",JSONPath=".status.serviceReadyReplicas",description="The Ready Service Replica."
-// +kubebuilder:printcolumn:name="Deployment",type="integer",JSONPath=".status.deploymentReplicas",description="The Deployment Replica."
-// +kubebuilder:printcolumn:name="ReadyDeployment",type="integer",JSONPath=".status.deploymentReadyReplicas",description="The Ready Deployment Replica."
-// +kubebuilder:deprecatedversion:warning="iot.openyurt.io/v1alpha1 PlatformAdmin will be deprecated in future; use iot.openyurt.io/v1alpha2 PlatformAdmin; v1alpha1 PlatformAdmin.Spec.ServiceType only support ClusterIP"
-// +kubebuilder:unservedversion
+// +kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="The platformadmin ready status"
+// +kubebuilder:printcolumn:name="ReadyComponentNum",type="integer",JSONPath=".status.readyComponentNum",description="The Ready Component."
+// +kubebuilder:printcolumn:name="UnreadyComponentNum",type="integer",JSONPath=".status.unreadyComponentNum",description="The Unready Component."
+// +kubebuilder:storageversion
 
 // PlatformAdmin is the Schema for the samples API
 type PlatformAdmin struct {
