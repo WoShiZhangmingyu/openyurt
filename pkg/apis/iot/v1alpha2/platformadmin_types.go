@@ -105,7 +105,7 @@ type PlatformAdminCondition struct {
 // +kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="The platformadmin ready status"
 // +kubebuilder:printcolumn:name="ReadyComponentNum",type="integer",JSONPath=".status.readyComponentNum",description="The Ready Component."
 // +kubebuilder:printcolumn:name="UnreadyComponentNum",type="integer",JSONPath=".status.unreadyComponentNum",description="The Unready Component."
-// +kubebuilder:unservedversion
+// +kubebuilder:deprecatedversion
 
 // PlatformAdmin is the Schema for the samples API
 type PlatformAdmin struct {
